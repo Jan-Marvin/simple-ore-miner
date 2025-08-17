@@ -1,0 +1,31 @@
+{
+	"schemaVersion": 1,
+	"id": "simpleoreminer",
+	"version": "${version}",
+	"name": "simpleoreminer",
+	"description": "Simple Ore Miner",
+	"authors": [
+		"Jan-Marvin"
+	],
+	"contact": {
+		"homepage": "https://github.com/Jan-Marvin/simple-ore-miner",
+		"issues": "https://github.com/Jan-Marvin/simple-ore-miner/issues",
+		"sources": "https://github.com/Jan-Marvin/simple-ore-miner"
+	},
+	"license": "CC BY-NC-ND 4.0",
+	"icon": "assets/simpleoreminer/icon.png",
+	"environment": "*",
+	"entrypoints": {
+		"main": [
+			"jmr.simpleoreminer.som"
+		]
+	},
+	"mixins": [
+	],
+	"depends": {
+		"fabricloader": ">=0.16.14",
+		"minecraft": "~1.21.3",
+		"java": ">=21",
+		"fabric-api": "*"
+	}
+}

@@ -1,0 +1,51 @@
+name: fabric builder
+run-name: Build simpleoreminer ${{ github.ref_name }}
+
+on:
+  push:
+    tags:
+      - "fabric-v*.*.*"
+  
+permissions:
+  contents: write
+  
+jobs:
+  gradle:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-java@v4
+      with:
+        distribution: temurin
+        java-version: 21
+        
+
+    - name: Setup Gradle
+      uses: gradle/actions/setup-gradle@v3
+    
+    - name: Execute Gradle build
+      run: chmod +x gradlew && ./gradlew build
+
+
+    - name: Generate release body
+      run: |
+        echo "ReleaseVersion=$(cut -c 8- <<< ${{ github.ref_name }})" >> "$GITHUB_ENV"
+        echo "MinecraftVersion=$(cut -c 19- <<< $(cat gradle.properties | grep minecraft_version))" >> "$GITHUB_ENV"
+        echo "ModVersion=$(cut -c 13- <<< $(cat gradle.properties | grep mod_version))" >> "$GITHUB_ENV"
+      
+    - name: sign jar
+      run: |
+        echo "${{ secrets.SAF_B64 }}" > saf.b64
+        base64 -d saf.b64 > saf
+        jarsigner -storepass "${{ secrets.SAFP }}" -keystore saf build/libs/simpleoreminer-${{ env.ModVersion }}.jar saf
+      
+    - name: Publish
+      uses: softprops/action-gh-release@v2
+      with:
+        name: simpleoreminer Fabric ${{ env.ReleaseVersion }}
+        generate_release_notes: true
+        body: For Minecraft ${{ env.MinecraftVersion }}
+        tag_name: ${{ github.ref }}
+        files: build/libs/simpleoreminer-${{ env.ModVersion }}.jar
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
