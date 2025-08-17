@@ -12,13 +12,15 @@ import net.minecraft.enchantment.Enchantments;
 import net.minecraft.entity.ExperienceOrbEntity;
 import net.minecraft.entity.EquipmentSlot;
 import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
-import net.minecraft.item.PickaxeItem;
 import net.minecraft.registry.RegistryKeys;
+import net.minecraft.registry.tag.TagKey;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.text.Text;
 import net.minecraft.util.ActionResult;
 import net.minecraft.util.Hand;
+import net.minecraft.util.Identifier;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Direction;
 import net.minecraft.world.World;
@@ -35,26 +37,27 @@ public class som implements ModInitializer {
     private static final Map<UUID, Boolean> svmEnabled = new HashMap<>();
     private static final Map<UUID, Long> lastToggleAt = new HashMap<>();
     private static final long toggleCooldownMs = 250;
+    TagKey<Item> PICKAXES = TagKey.of(RegistryKeys.ITEM, Identifier.of("minecraft", "pickaxes"));
 
     private static final Set<Block> ORE_BLOCKS = new HashSet<>(Arrays.asList(
-            // Overworld + Deepslate
-            Blocks.IRON_ORE, Blocks.DEEPSLATE_IRON_ORE,
-            Blocks.COAL_ORE, Blocks.DEEPSLATE_COAL_ORE,
-            Blocks.GOLD_ORE, Blocks.DEEPSLATE_GOLD_ORE,
-            Blocks.DIAMOND_ORE, Blocks.DEEPSLATE_DIAMOND_ORE,
-            Blocks.EMERALD_ORE, Blocks.DEEPSLATE_EMERALD_ORE,
-            Blocks.REDSTONE_ORE, Blocks.DEEPSLATE_REDSTONE_ORE,
-            Blocks.LAPIS_ORE, Blocks.DEEPSLATE_LAPIS_ORE,
-            Blocks.COPPER_ORE, Blocks.DEEPSLATE_COPPER_ORE,
-            // Nether
-            Blocks.NETHER_QUARTZ_ORE,
-            Blocks.NETHER_GOLD_ORE,
-            Blocks.ANCIENT_DEBRIS
+        // Overworld + Deepslate
+        Blocks.IRON_ORE, Blocks.DEEPSLATE_IRON_ORE,
+        Blocks.COAL_ORE, Blocks.DEEPSLATE_COAL_ORE,
+        Blocks.GOLD_ORE, Blocks.DEEPSLATE_GOLD_ORE,
+        Blocks.DIAMOND_ORE, Blocks.DEEPSLATE_DIAMOND_ORE,
+        Blocks.EMERALD_ORE, Blocks.DEEPSLATE_EMERALD_ORE,
+        Blocks.REDSTONE_ORE, Blocks.DEEPSLATE_REDSTONE_ORE,
+        Blocks.LAPIS_ORE, Blocks.DEEPSLATE_LAPIS_ORE,
+        Blocks.COPPER_ORE, Blocks.DEEPSLATE_COPPER_ORE,
+        // Nether
+        Blocks.NETHER_QUARTZ_ORE,
+        Blocks.NETHER_GOLD_ORE,
+        Blocks.ANCIENT_DEBRIS
     ));
 
     private static final Direction[] NEIGHBOR_DIRECTIONS = new Direction[]{
-            Direction.NORTH, Direction.SOUTH, Direction.EAST,
-            Direction.WEST, Direction.UP, Direction.DOWN
+        Direction.NORTH, Direction.SOUTH, Direction.EAST,
+        Direction.WEST, Direction.UP, Direction.DOWN
     };
 
     @Override
@@ -65,7 +68,6 @@ public class som implements ModInitializer {
     }
 
     private ActionResult toggleSVM(PlayerEntity player, World world, Hand hand) {
-
         if (world.isClient) {
             return ActionResult.PASS;
         }
@@ -74,7 +76,7 @@ public class som implements ModInitializer {
             return ActionResult.PASS;
         }
 
-        if (!(player.getMainHandStack().getItem() instanceof PickaxeItem)) {
+        if (!player.getMainHandStack().isIn(PICKAXES)) {
             return ActionResult.PASS;
         }
 
