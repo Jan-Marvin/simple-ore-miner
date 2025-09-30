@@ -68,7 +68,7 @@ public class som implements ModInitializer {
     }
 
     private ActionResult toggleSVM(PlayerEntity player, World world, Hand hand) {
-        if (world.isClient) {
+        if (world.isClient()) {
             return ActionResult.PASS;
         }
 
@@ -109,7 +109,7 @@ public class som implements ModInitializer {
     }
 
     private boolean onBlockBreak(World world, PlayerEntity player, BlockPos pos, BlockState state, @Nullable BlockEntity blockEntity) {
-        if (world.isClient) return true;
+        if (world.isClient()) return true;
 
         if (!isOreBlock(state.getBlock())) return true;
 
