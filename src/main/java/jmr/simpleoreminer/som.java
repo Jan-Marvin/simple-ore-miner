@@ -3,27 +3,22 @@ package jmr.simpleoreminer;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.event.player.PlayerBlockBreakEvents;
 import net.fabricmc.fabric.api.event.player.UseItemCallback;
-import net.minecraft.block.Block;
-import net.minecraft.block.BlockState;
-import net.minecraft.block.Blocks;
-import net.minecraft.block.entity.BlockEntity;
-import net.minecraft.enchantment.EnchantmentHelper;
-import net.minecraft.enchantment.Enchantments;
-import net.minecraft.entity.ExperienceOrbEntity;
-import net.minecraft.entity.EquipmentSlot;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
-import net.minecraft.registry.RegistryKeys;
-import net.minecraft.registry.tag.TagKey;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.text.Text;
-import net.minecraft.util.ActionResult;
-import net.minecraft.util.Hand;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Direction;
-import net.minecraft.world.World;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
+import net.minecraft.tags.TagKey;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.state.BlockState;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,31 +28,20 @@ import java.util.*;
 public class som implements ModInitializer {
     public static final Logger LOGGER = LoggerFactory.getLogger("simpleoreminer");
 
-
     private static final Map<UUID, Boolean> svmEnabled = new HashMap<>();
     private static final Map<UUID, Long> lastToggleAt = new HashMap<>();
-    private static final long toggleCooldownMs = 250;
-    TagKey<Item> PICKAXES = TagKey.of(RegistryKeys.ITEM, Identifier.of("minecraft", "pickaxes"));
+    private static final long TOGGLE_COOLDOWN_MS = 250;
 
-    private static final Set<Block> ORE_BLOCKS = new HashSet<>(Arrays.asList(
-        // Overworld + Deepslate
-        Blocks.IRON_ORE, Blocks.DEEPSLATE_IRON_ORE,
-        Blocks.COAL_ORE, Blocks.DEEPSLATE_COAL_ORE,
-        Blocks.GOLD_ORE, Blocks.DEEPSLATE_GOLD_ORE,
-        Blocks.DIAMOND_ORE, Blocks.DEEPSLATE_DIAMOND_ORE,
-        Blocks.EMERALD_ORE, Blocks.DEEPSLATE_EMERALD_ORE,
-        Blocks.REDSTONE_ORE, Blocks.DEEPSLATE_REDSTONE_ORE,
-        Blocks.LAPIS_ORE, Blocks.DEEPSLATE_LAPIS_ORE,
-        Blocks.COPPER_ORE, Blocks.DEEPSLATE_COPPER_ORE,
-        // Nether
-        Blocks.NETHER_QUARTZ_ORE,
-        Blocks.NETHER_GOLD_ORE,
-        Blocks.ANCIENT_DEBRIS
-    ));
+    private final TagKey<Item> PICKAXES = TagKey.create(
+            Registries.ITEM,
+            Identifier.fromNamespaceAndPath("minecraft", "pickaxes")
+    );
 
-    private static final Direction[] NEIGHBOR_DIRECTIONS = new Direction[]{
-        Direction.NORTH, Direction.SOUTH, Direction.EAST,
-        Direction.WEST, Direction.UP, Direction.DOWN
+    private final TagKey<Block> ORES = TagKey.create(Registries.BLOCK, Identifier.fromNamespaceAndPath("c", "ores"));
+
+    private static final Direction[] NEIGHBOR_DIRECTIONS = {
+            Direction.NORTH, Direction.SOUTH, Direction.EAST,
+            Direction.WEST, Direction.UP, Direction.DOWN
     };
 
     @Override
@@ -65,91 +49,76 @@ public class som implements ModInitializer {
         LOGGER.info("Registering som!");
         PlayerBlockBreakEvents.BEFORE.register(this::onBlockBreak);
         UseItemCallback.EVENT.register(this::toggleSVM);
+
+        ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> {
+            UUID id = handler.player.getUUID();
+            svmEnabled.remove(id);
+            lastToggleAt.remove(id);
+        });
     }
 
-    private ActionResult toggleSVM(PlayerEntity player, World world, Hand hand) {
-        if (world.isClient()) {
-            return ActionResult.PASS;
-        }
-
-        if (hand != Hand.MAIN_HAND) {
-            return ActionResult.PASS;
-        }
-
-        if (!player.getMainHandStack().isIn(PICKAXES)) {
-            return ActionResult.PASS;
-        }
-
-        if (!player.isSneaking()) {
-            return ActionResult.PASS;
-        }
+    private InteractionResult toggleSVM(Player player, Level level, InteractionHand hand) {
+        if (level.isClientSide()) return InteractionResult.PASS;
+        if (hand != InteractionHand.MAIN_HAND) return InteractionResult.PASS;
+        if (!player.getItemInHand(InteractionHand.MAIN_HAND).is(PICKAXES)) return InteractionResult.PASS;
+        if (!player.isCrouching()) return InteractionResult.PASS;
 
         long now = System.currentTimeMillis();
-        long last = lastToggleAt.getOrDefault(player.getUuid(), 0L);
-        if (now - last < toggleCooldownMs) {
-            return ActionResult.SUCCESS;
+        if (now - lastToggleAt.getOrDefault(player.getUUID(), 0L) < TOGGLE_COOLDOWN_MS) {
+            return InteractionResult.SUCCESS;
         }
 
-        lastToggleAt.put(player.getUuid(), now);
+        lastToggleAt.put(player.getUUID(), now);
         boolean newState = toggleEnabled(player);
-        player.sendMessage(newState ? Text.translatable("text.som.on") : Text.translatable("text.som.off"), true);
+        player.sendOverlayMessage(
+                newState ? Component.translatable("text.som.on")
+                        : Component.translatable("text.som.off")
+        );
 
-        return ActionResult.PASS;
+        return InteractionResult.PASS;
     }
 
-    private boolean toggleEnabled(PlayerEntity player) {
-        UUID id = player.getUuid();
+    private boolean toggleEnabled(Player player) {
+        UUID id = player.getUUID();
         boolean next = !svmEnabled.getOrDefault(id, true);
         svmEnabled.put(id, next);
         return next;
     }
 
-    private boolean isEnabled(PlayerEntity player) {
-        return svmEnabled.getOrDefault(player.getUuid(), true);
+    private boolean isEnabled(Player player) {
+        return svmEnabled.getOrDefault(player.getUUID(), true);
     }
 
-    private boolean onBlockBreak(World world, PlayerEntity player, BlockPos pos, BlockState state, @Nullable BlockEntity blockEntity) {
-        if (world.isClient()) return true;
-
-        if (!isOreBlock(state.getBlock())) return true;
-
+    private boolean onBlockBreak(Level level, Player player, BlockPos pos,
+                                 BlockState state, @Nullable BlockEntity blockEntity) {
+        if (level.isClientSide()) return true;
+        if (!state.is(ORES)) return true;
         if (!isEnabled(player)) return true;
+        if (player.isCreative()) return true;
+        if (!player.hasCorrectToolForDrops(state)) return true;
 
-        if (player.isCreative()) {
-            return true;
-        }
+        ItemStack tool = player.getItemInHand(InteractionHand.MAIN_HAND);
 
-        if (!player.canHarvest(state)) {
-            return true;
-        }
+        int maxBreaks = tool.isDamageableItem()
+                ? Math.max(0, tool.getMaxDamage() - tool.getDamageValue())
+                : Integer.MAX_VALUE;
 
-        ItemStack tool = player.getMainHandStack();
+        if (maxBreaks == 0) return true;
 
-        int maxBreaks = !tool.isDamageable() ? Integer.MAX_VALUE : Math.max(0, tool.getMaxDamage() - tool.getDamage());
+        List<BlockPos> toBreak = findConnectedOres(level, pos, state.getBlock(), maxBreaks);
 
-        List<BlockPos> toBreak = findConnectedOres(world, pos, state.getBlock(), maxBreaks);
+        if (toBreak.size() <= 1) return true;
 
-        if(toBreak.size() == 1) {
-            return true;
-        }
-
-        int broken = 0;
         for (BlockPos orePos : toBreak) {
-            if (broken >= maxBreaks) break;
-            if (breakBlockWithFortuneAndXP(world, orePos, player, tool)) {
+            if (breakBlock(level, orePos, player, tool)) {
                 damageTool(player, tool);
-                broken++;
             }
         }
         return false;
     }
 
-
-    private boolean isOreBlock(Block block) {
-        return ORE_BLOCKS.contains(block);
-    }
-
-    private List<BlockPos> findConnectedOres(World world, BlockPos startPos, Block targetBlock, int maxBlocks) {
+    private List<BlockPos> findConnectedOres(Level world, BlockPos startPos,
+                                             Block targetBlock, int maxBlocks) {
         LinkedHashSet<BlockPos> visited = new LinkedHashSet<>();
         Queue<BlockPos> queue = new ArrayDeque<>();
         queue.add(startPos);
@@ -160,10 +129,11 @@ public class som implements ModInitializer {
                 for (Direction dir : NEIGHBOR_DIRECTIONS) {
                     if (visited.size() >= maxBlocks) break;
 
-                    BlockPos neighbor = curr.offset(dir);
-                    if (!world.isInBuildLimit(neighbor)) continue;
+                    BlockPos neighbor = curr.offset(dir.getUnitVec3i());
+                    if (!world.isInWorldBounds(neighbor)) continue;
 
-                    if (world.getBlockState(neighbor).getBlock() == targetBlock && !visited.contains(neighbor)) {
+                    if (world.getBlockState(neighbor).getBlock() == targetBlock
+                            && !visited.contains(neighbor)) {
                         queue.add(neighbor);
                     }
                 }
@@ -172,67 +142,24 @@ public class som implements ModInitializer {
         return new ArrayList<>(visited);
     }
 
-    private boolean breakBlockWithFortuneAndXP(World world, BlockPos pos, PlayerEntity player, ItemStack tool) {
-        BlockState state = world.getBlockState(pos);
+    private boolean breakBlock(Level level, BlockPos pos, Player player, ItemStack tool) {
+        BlockState state = level.getBlockState(pos);
         if (state.isAir()) return false;
 
-        if (player.isCreative()) {
-            return world.breakBlock(pos, false, player);
-        }
+        BlockEntity be = level.getBlockEntity(pos);
 
-        List<ItemStack> drops = Block.getDroppedStacks(state, (ServerWorld) world, pos, null, player, tool);
-        boolean blockRemoved = world.breakBlock(pos, false, player);
+        boolean removed = level.destroyBlock(pos, false, player);
+        if (!removed) return false;
 
-        if (!blockRemoved) return false;
+        Block.dropResources(state, level, pos, be, player, tool);
 
-        for (ItemStack drop : drops) {
-            Block.dropStack(world, pos, drop);
-        }
-
-        int exp = getDroppedExperience(state, world, pos, tool);
-        if (exp > 0 && world instanceof ServerWorld serverWorld) {
-            serverWorld.spawnEntity(new ExperienceOrbEntity(serverWorld,
-                    pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5, exp));
-        }
         return true;
     }
 
-    private int getDroppedExperience(BlockState state, World world, BlockPos pos, ItemStack tool) {
-
-        if (tool.hasEnchantments() && (EnchantmentHelper.getLevel(world.getRegistryManager().getOrThrow(RegistryKeys.ENCHANTMENT).getOrThrow(Enchantments.SILK_TOUCH), tool) > 0)) {
-            return 0;
-        }
-
-        Block block = state.getBlock();
-
-        if (block == Blocks.COAL_ORE || block == Blocks.DEEPSLATE_COAL_ORE) {
-            return world.getRandom().nextInt(3); // 0 - 2
-        }
-        if (block == Blocks.DIAMOND_ORE || block == Blocks.DEEPSLATE_DIAMOND_ORE) {
-            return world.getRandom().nextInt(5) + 3; // 3 - 7
-        }
-        if (block == Blocks.EMERALD_ORE || block == Blocks.DEEPSLATE_EMERALD_ORE) {
-            return world.getRandom().nextInt(5) + 3; // 3 - 7
-        }
-        if (block == Blocks.LAPIS_ORE || block == Blocks.DEEPSLATE_LAPIS_ORE) {
-            return world.getRandom().nextInt(4) + 2; // 2 - 5
-        }
-        if (block == Blocks.NETHER_QUARTZ_ORE) {
-            return world.getRandom().nextInt(4) + 2; // 2 - 5
-        }
-        if (block == Blocks.NETHER_GOLD_ORE) {
-            return world.getRandom().nextInt(2); // 0 - 1
-        }
-        if (block == Blocks.REDSTONE_ORE || block == Blocks.DEEPSLATE_REDSTONE_ORE) {
-            return world.getRandom().nextInt(5) + 1; // 1 - 5
-        }
-        return 0;
-    }
-
-    private void damageTool(PlayerEntity player, ItemStack tool) {
+    private void damageTool(Player player, ItemStack tool) {
         if (player.isCreative()) return;
-        if (tool.isDamageable()) {
-            tool.damage(1, player, EquipmentSlot.MAINHAND);
+        if (tool.isDamageableItem()) {
+            tool.hurtAndBreak(1, player, InteractionHand.MAIN_HAND);
         }
     }
 }

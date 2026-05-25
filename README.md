@@ -1,1 +1,1 @@
-# Simple Ore Miner Fabric 1.21.x
+# Simple Ore Miner Fabric 26.x
