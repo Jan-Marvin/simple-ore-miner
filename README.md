@@ -20,6 +20,7 @@ Get it on [modrinth](https://modrinth.com/mod/simple-ore-miner) or below:
   
 | Minecraft Version  | Fabric |
 | :----: |  :----: |
+| 26.2 | [Download](https://github.com/Jan-Marvin/simple-ore-miner/releases/download/fabric-v1.1.0/simpleoreminer-1.1.0.jar)
 | 26.1.2 | [Download](https://github.com/Jan-Marvin/simple-ore-miner/releases/download/fabric-v1.1.0/simpleoreminer-1.1.0.jar)
 
 
