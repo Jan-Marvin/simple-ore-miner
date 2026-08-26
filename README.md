@@ -18,10 +18,10 @@ Get it on [modrinth](https://modrinth.com/mod/simple-ore-miner) or below:
 <details open>
   <summary>26.x</summary>
   
-| Minecraft Version  | Fabric |
-| :----: |  :----: |
-| 26.2 | [Download](https://github.com/Jan-Marvin/simple-ore-miner/releases/download/fabric-v1.1.0/simpleoreminer-1.1.0.jar)
-| 26.1.2 | [Download](https://github.com/Jan-Marvin/simple-ore-miner/releases/download/fabric-v1.1.0/simpleoreminer-1.1.0.jar)
+| Minecraft Version  | Fabric | NeoForge |
+| :----: |  :----: | :----: |
+| 26.2 | [Download](https://github.com/Jan-Marvin/simple-ore-miner/releases/download/fabric-v1.1.0/simpleoreminer-1.1.0.jar) | [Download](https://github.com/Jan-Marvin/simple-ore-miner/releases/download/neoforge-v1.1.0/simpleoreminer-1.1.0.jar)
+| 26.1.2 | [Download](https://github.com/Jan-Marvin/simple-ore-miner/releases/download/fabric-v1.1.0/simpleoreminer-1.1.0.jar) | 
 
 
 </details>
