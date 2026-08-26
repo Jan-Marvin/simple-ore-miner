@@ -38,7 +38,7 @@ jobs:
         jarsigner -storepass "${{ secrets.SAFP }}" -keystore saf build/libs/simpleoreminer-${{ env.ModVersion }}.jar saf
 
     - name: Publish
-      uses: softprops/action-gh-release@v1
+      uses: softprops/action-gh-release@v2
       with:
         name: simpleoreminer NeoForge ${{ env.ReleaseVersion }}
         generate_release_notes: true
